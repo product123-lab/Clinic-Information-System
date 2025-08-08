@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>View Patient Records</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      text-align: center;
+      background: #f9f9f9;
+    }
+    h1 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+    #navButtons {
+      margin-bottom: 20px;
+    }
+    #navButtons button {
+      margin: 5px;
+      padding: 10px 18px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      transition: background-color 0.3s;
+    }
+    #navButtons button:hover {
+      background-color: #0056b3;
+    }
+    #actionButtons {
+      margin-bottom: 20px;
+    }
+    #actionButtons button {
+      margin: 5px;
+      padding: 10px 18px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #28a745;
+      color: white;
+      transition: background-color 0.3s;
+    }
+    #actionButtons button:hover {
+      background-color: #1e7e34;
+    }
+    #deleteAllBtn {
+      background-color: #dc3545;
+    }
+    #deleteAllBtn:hover {
+      background-color: #a71d2a;
+    }
+    #viewHistoryBtn {
+      background-color: #0069d9;
+    }
+    #viewHistoryBtn:hover {
+      background-color: #004a9f;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      margin-top: 20px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 12px 15px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background-color: #007bff;
+      color: white;
+      user-select: none;
+    }
+
+    /* Modal styles */
+    #historyModal, #employeeListModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.6);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+      padding: 40px 0;
+    }
+    #historyModalContent, #employeeListModalContent {
+      background: white;
+      padding: 30px 40px;
+      border-radius: 8px;
+      width: 700px;
+      max-height: 80vh;
+      overflow-y: auto;
+      text-align: left;
+      box-shadow: 0 0 15px rgba(0,0,0,0.25);
+      position: relative;
+    }
+    #historyModalContent h2, #employeeListModalContent h2 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    #historyContent p, #employeeListContent p {
+      margin: 8px 0;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    #historyContent ul, #employeeListContent ul {
+      padding-left: 20px;
+    }
+    #historyContent li, #employeeListContent li {
+      margin-bottom: 6px;
+      font-size: 14px;
+      line-height: 1.3;
+      cursor: pointer;
+      color: #007bff;
+      text-decoration: underline;
+    }
+    #historyContent li:hover, #employeeListContent li:hover {
+      color: #0056b3;
+    }
+    #closeModalBtn, #closeEmployeeListBtn {
+      display: block;
+      margin: 20px auto 0;
+      padding: 10px 25px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 15px;
+      transition: background-color 0.3s;
+    }
+    #closeModalBtn:hover, #closeEmployeeListBtn:hover {
+      background-color: #0056b3;
+    }
+
+  </style>
+</head>
+<body>
+
+  <h1>View Patient Records</h1>
+
+  <div id="navButtons">
+    <button id="viewAllBtn">View All Records</button>
+    <button id="viewGuestBtn">View Guest Records</button>
+    <button id="viewEmployeeBtn">View Employee Records</button>
+  </div>
+
+  <div id="actionButtons">
+    <button id="printBtn">Print</button>
+    <button id="exportBtn">Export to Excel</button>
+    <button id="deleteAllBtn">Delete All Displayed Records</button>
+    <button id="backBtn">Back to Dashboard</button>
+    <button id="viewHistoryBtn">View History</button>
+  </div>
+
+  <table id="recordsTable"></table>
+
+  <!-- Modal for showing employee list for Patient ID -->
+  <div id="employeeListModal">
+    <div id="employeeListModalContent">
+      <h2>Select Employee Name</h2>
+      <div id="employeeListContent"></div>
+      <button id="closeEmployeeListBtn">Close</button>
+    </div>
+  </div>
+
+  <!-- Modal for full history -->
+  <div id="historyModal">
+    <div id="historyModalContent">
+      <h2 id="historyTitle">Full History</h2>
+      <div id="historyContent"></div>
+      <button id="closeModalBtn">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser"));
+    if (!loggedInUser) {
+      alert("Please login first.");
+      window.location.href = "index.html";
+    }
+
+    const recordsTable = document.getElementById("recordsTable");
+    const printBtn = document.getElementById("printBtn");
+    const exportBtn = document.getElementById("exportBtn");
+    const deleteAllBtn = document.getElementById("deleteAllBtn");
+    const backBtn = document.getElementById("backBtn");
+    const viewAllBtn = document.getElementById("viewAllBtn");
+    const viewGuestBtn = document.getElementById("viewGuestBtn");
+    const viewEmployeeBtn = document.getElementById("viewEmployeeBtn");
+    const viewHistoryBtn = document.getElementById("viewHistoryBtn");
+
+    const historyModal = document.getElementById("historyModal");
+    const historyTitle = document.getElementById("historyTitle");
+    const historyContent = document.getElementById("historyContent");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const historyModalContent = document.getElementById("historyModalContent");
+
+    const employeeListModal = document.getElementById("employeeListModal");
+    const employeeListContent = document.getElementById("employeeListContent");
+    const closeEmployeeListBtn = document.getElementById("closeEmployeeListBtn");
+
+    const employeeExtraFields = [
+      { id: "civilStatus", label: "Civil Status" },
+      { id: "department", label: "Department" }
+    ];
+
+    const commonFields = [
+      { id: "patientID", label: "Patient ID" },
+      { id: "patientName", label: "Patient Name" },
+      { id: "patientAge", label: "Age" },
+      { id: "sex", label: "Sex" },
+      { id: "patientAddress", label: "Address" },
+      { id: "walkInDate", label: "Walk-in Date" },
+      { id: "chiefComplaint", label: "Chief Complaint" },
+      { id: "history", label: "History of Past Illness" },
+      { id: "medication", label: "Medication" }
+    ];
+
+    let currentFilter = null;
+
+    function renderTableHeader() {
+      recordsTable.innerHTML = "";
+      const header = recordsTable.createTHead();
+      const row = header.insertRow();
+
+      let fieldsToShow;
+      if (currentFilter === "employee") {
+        fieldsToShow = [...commonFields, ...employeeExtraFields];
+      } else if (currentFilter === "guest") {
+        fieldsToShow = [...commonFields];
+      } else {
+        fieldsToShow = [...commonFields, ...employeeExtraFields];
+      }
+
+      fieldsToShow.forEach(f => {
+        const th = document.createElement("th");
+        th.textContent = f.label;
+        row.appendChild(th);
+      });
+
+      ["Timestamp", "Saved By"].forEach(text => {
+        const th = document.createElement("th");
+        th.textContent = text;
+        row.appendChild(th);
+      });
+    }
+
+    function loadPatients() {
+      const allPatients = JSON.parse(localStorage.getItem("patients")) || [];
+      if (currentFilter === "guest" || currentFilter === "employee") {
+        return allPatients.filter(p => p.type === currentFilter);
+      }
+      return allPatients;
+    }
+
+    function renderRecords() {
+      renderTableHeader();
+
+      const patients = loadPatients();
+      const tbody = recordsTable.createTBody();
+
+      let fieldsToShow;
+      if (currentFilter === "employee") {
+        fieldsToShow = [...commonFields, ...employeeExtraFields];
+      } else if (currentFilter === "guest") {
+        fieldsToShow = [...commonFields];
+      } else {
+        fieldsToShow = [...commonFields, ...employeeExtraFields];
+      }
+
+      patients.forEach(patient => {
+        const row = tbody.insertRow();
+
+        fieldsToShow.forEach(f => {
+          const cell = row.insertCell();
+          let val = patient[f.id] || "";
+          if (f.id === "sex") {
+            val = val === "M" ? "Male" : val === "F" ? "Female" : "";
+          }
+          cell.textContent = val;
+        });
+
+        const timestampCell = row.insertCell();
+        timestampCell.textContent = patient.timestamp || "";
+
+        const savedByCell = row.insertCell();
+        savedByCell.textContent = patient.savedBy || "";
+      });
+    }
+
+    function openHistoryModal(patient) {
+      historyTitle.textContent = `Full History for ${patient.patientName || "Unknown"}`;
+
+      let html = `<hr>`;
+
+      const months = [
+        "January","February","March","April","May","June",
+        "July","August","September","October","November","December"
+      ];
+
+      for (let i=1; i<=12; i++) {
+        const monthKey = "month" + i;
+        if (patient[monthKey]) {
+          const monthData = patient[monthKey];
+          html += `<h3>${months[i-1]}</h3><ul>`;
+          for (const [key, val] of Object.entries(monthData)) {
+            html += `<li><strong>${key}:</strong> ${val}</li>`;
+          }
+          html += `</ul>`;
+        }
+      }
+
+      historyContent.innerHTML = html;
+      historyModal.style.display = "flex";
+    }
+
+    // Show records for a particular employee and patient ID
+    function showEmployeePatientRecords(patientID, employeeName) {
+      const allPatients = JSON.parse(localStorage.getItem("patients")) || [];
+      const records = allPatients.filter(p => p.patientID === patientID && p.savedBy === employeeName);
+
+      if (records.length === 0) {
+        alert("No records found for employee " + employeeName + " and Patient ID " + patientID);
+        return;
+      }
+
+      // Get patient name from first record (assuming all have same patientName)
+      const patientName = records[0].patientName || "Unknown";
+
+      // Update header with Patient Name, Employee Name, and Patient ID + print button
+      historyTitle.innerHTML = `
+        Records for Patient: <strong>${patientName}</strong><br>
+        Employee: <strong>${employeeName}</strong><br>
+        Patient ID: <strong>${patientID}</strong>
+        <button id="modalPrintBtn" style="
+          margin-left: 20px;
+          padding: 5px 10px;
+          background-color: #008CFF;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+        ">Print</button>
+      `;
+
+      let html = `<table style="width: 100%; border-collapse: collapse;">`;
+      html += `<thead><tr>
+        <th style="border: 1px solid #ddd; padding: 8px; background-color: #007bff; color: white;">Date</th>
+        <th style="border: 1px solid #ddd; padding: 8px; background-color: #007bff; color: white;">Chief Complaint</th>
+        <th style="border: 1px solid #ddd; padding: 8px; background-color: #007bff; color: white;">History of Past Illness</th>
+        <th style="border: 1px solid #ddd; padding: 8px; background-color: #007bff; color: white;">Medication</th>
+      </tr></thead><tbody>`;
+
+      records.forEach(rec => {
+        html += `<tr>
+          <td style="border: 1px solid #ddd; padding: 8px;">${rec.walkInDate || ""}</td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${rec.chiefComplaint || ""}</td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${rec.history || ""}</td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${rec.medication || ""}</td>
+        </tr>`;
+      });
+
+      html += "</tbody></table>";
+
+      historyContent.innerHTML = html;
+      historyModal.style.display = "flex";
+
+      // Add event listener to the new print button inside the modal
+      document.getElementById("modalPrintBtn").addEventListener("click", () => {
+        // Print only the modal content
+        const printContents = historyModalContent.innerHTML;
+        const originalContents = document.body.innerHTML;
+
+        document.body.innerHTML = printContents;
+        window.print();
+        document.body.innerHTML = originalContents;
+        window.location.reload(); // Restore event listeners and page state
+      });
+    }
+
+    // Print main records table
+    printBtn.onclick = () => {
+      if (recordsTable.rows.length === 0) {
+        alert("No records to print.");
+        return;
+      }
+      const printContent = recordsTable.outerHTML;
+      const newWindow = window.open("", "", "width=900,height=600");
+      newWindow.document.write(`<html><head><title>Print Records</title>`);
+      newWindow.document.write(`<style>table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background:#007bff;color:#fff;}</style>`);
+      newWindow.document.write(`</head><body>`);
+      newWindow.document.write(printContent);
+      newWindow.document.write(`</body></html>`);
+      newWindow.document.close();
+      newWindow.focus();
+      newWindow.print();
+      newWindow.close();
+    };
+
+    // Export to Excel (CSV) - simplified version
+    exportBtn.onclick = () => {
+      if (recordsTable.rows.length === 0) {
+        alert("No records to export.");
+        return;
+      }
+      let csv = [];
+      for (let row of recordsTable.rows) {
+        let rowData = [];
+        for (let cell of row.cells) {
+          rowData.push('"' + cell.innerText.replace(/"/g, '""') + '"');
+        }
+        csv.push(rowData.join(","));
+      }
+      const csvString = csv.join("\n");
+      const blob = new Blob([csvString], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "patient_records.csv";
+      a.click();
+
+      URL.revokeObjectURL(url);
+    };
+
+    // Delete all displayed records from localStorage (with confirmation)
+    deleteAllBtn.onclick = () => {
+      if (confirm("Are you sure you want to delete ALL displayed records? This cannot be undone.")) {
+        const allPatients = JSON.parse(localStorage.getItem("patients")) || [];
+        let filteredPatients;
+        if (currentFilter === "guest" || currentFilter === "employee") {
+          filteredPatients = allPatients.filter(p => p.type !== currentFilter);
+        } else {
+          filteredPatients = [];
+        }
+        localStorage.setItem("patients", JSON.stringify(filteredPatients));
+        renderRecords();
+      }
+    };
+
+    backBtn.onclick = () => {
+      window.location.href = "dashboard.html";
+    };
+
+    viewAllBtn.onclick = () => {
+      currentFilter = null;
+      renderRecords();
+    };
+
+    viewGuestBtn.onclick = () => {
+      currentFilter = "guest";
+      renderRecords();
+    };
+
+    viewEmployeeBtn.onclick = () => {
+      currentFilter = "employee";
+      renderRecords();
+    };
+
+    viewHistoryBtn.onclick = () => {
+      // Get patient ID and employee name from user prompt for demo
+      const patientID = prompt("Enter Patient ID to view records:");
+      if (!patientID) return;
+
+      // If filter is employee, we can just pick savedBy, else show employee list modal to pick employee
+      if (currentFilter === "employee") {
+        // Just show for this patient ID with the logged in employee (for demo)
+        showEmployeePatientRecords(patientID, loggedInUser.name || "Unknown");
+      } else {
+        // Show modal to select employee name for patient ID
+        showEmployeeListForPatient(patientID);
+      }
+    };
+
+    closeModalBtn.onclick = () => {
+      historyModal.style.display = "none";
+    };
+
+    closeEmployeeListBtn.onclick = () => {
+      employeeListModal.style.display = "none";
+    };
+
+    // Show employee list modal for a given patient ID
+    function showEmployeeListForPatient(patientID) {
+      const allPatients = JSON.parse(localStorage.getItem("patients")) || [];
+      // Filter by patientID and get distinct employee names
+      const employees = [...new Set(allPatients.filter(p => p.patientID === patientID).map(p => p.savedBy))];
+
+      if (employees.length === 0) {
+        alert("No records found for Patient ID " + patientID);
+        return;
+      }
+
+      let html = `<p>Choose employee for Patient ID: <strong>${patientID}</strong></p><ul>`;
+      employees.forEach(emp => {
+        html += `<li data-emp="${emp}">${emp}</li>`;
+      });
+      html += "</ul>";
+
+      employeeListContent.innerHTML = html;
+      employeeListModal.style.display = "flex";
+
+      // Attach click listeners to each employee name
+      const listItems = employeeListContent.querySelectorAll("li");
+      listItems.forEach(li => {
+        li.addEventListener("click", () => {
+          const empName = li.getAttribute("data-emp");
+          employeeListModal.style.display = "none";
+          showEmployeePatientRecords(patientID, empName);
+        });
+      });
+    }
+
+    // Initial load: show all records
+    currentFilter = null;
+    renderRecords();
+
+  </script>
+</body>
+</html>
